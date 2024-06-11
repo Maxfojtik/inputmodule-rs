@@ -237,27 +237,14 @@ fn main() -> ! {
         brightness: 51, // Default to 51/255 = 20% brightness
         sleeping: SleepState::Awake,
         game: None,
-        animation_period: 31_250, // 31,250 us = 32 FPS
+        animation_period: 16_666, // 31,250 us = 32 FPS, 16,666 us = 60 FPS
         pwm_freq: PwmFreqArg::P29k,
         debug_mode: false,
         upcoming_frames: None,
     };
     state.debug_mode = dip1.is_low().unwrap();
     if show_startup_animation(&state) {
-        state.upcoming_frames = Some(match get_random_byte(&rosc) % 8 {
-            0 => Animation::Percentage(StartupPercentageIterator::default()),
-            1 => Animation::ZigZag(ZigZagIterator::default()),
-            2 => Animation::Gof(GameOfLifeIterator::new(GameOfLifeStartParam::Pattern1, 200)),
-            3 => Animation::Gof(GameOfLifeIterator::new(
-                GameOfLifeStartParam::BeaconToadBlinker,
-                128,
-            )),
-            4 => Animation::Gof(GameOfLifeIterator::new(GameOfLifeStartParam::Glider, 128)),
-            5 => Animation::Breathing(BreathingIterator::default()),
-            6 => Animation::Pong(PongIterator::default()),
-            7 => Animation::Snake(SnakeIterator::default()),
-            _ => unreachable!(),
-        });
+        state.upcoming_frames = Some(Animation::Gof(GameOfLifeIterator::new(GameOfLifeStartParam::Pattern1, 200)));
     } else {
         // If no startup animation, keep display always on
         state.grid = percentage(100);

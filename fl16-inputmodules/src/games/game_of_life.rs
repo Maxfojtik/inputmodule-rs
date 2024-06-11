@@ -10,6 +10,7 @@ pub enum Cell {
 #[derive(Clone)]
 pub struct GameOfLifeState {
     cells: [[Cell; WIDTH]; HEIGHT],
+    grid_copy: [[u8; WIDTH]; HEIGHT],
 }
 
 impl GameOfLifeState {
@@ -27,7 +28,7 @@ impl GameOfLifeState {
 }
 
 pub fn start_game(state: &mut LedmatrixState, _random: u8, param: GameOfLifeStartParam) {
-    let gol = GameOfLifeState::new(param, &state.grid);
+    let mut gol = GameOfLifeState::new(param, &state.grid);
     state.grid = gol.draw_matrix();
     state.game = Some(GameState::GameOfLife(gol));
 }
@@ -47,6 +48,21 @@ pub fn game_step(state: &mut LedmatrixState, _random: u8) {
     }
 }
 
+fn create_grid_copy(cells: [[Cell; WIDTH]; HEIGHT]) -> [[u8; WIDTH]; HEIGHT]
+{
+    let mut grid_copy = [[0; WIDTH]; HEIGHT];
+    for row in 0..HEIGHT {
+        for col in 0..WIDTH {
+            grid_copy[row][col] = if cells[row][col] == Cell::Alive {
+                255
+            } else {
+                0
+            };
+        }
+    }
+    grid_copy
+}
+
 impl GameOfLifeState {
     // TODO: Integrate Grid into GameOfLifeStartParam because it's only used in one of the enum variants
     pub fn new(param: GameOfLifeStartParam, grid: &Grid) -> Self {
@@ -54,6 +70,8 @@ impl GameOfLifeState {
             GameOfLifeStartParam::Beacon => Self::beacon(),
             GameOfLifeStartParam::CurrentMatrix => {
                 let mut cells = [[Cell::Dead; WIDTH]; HEIGHT];
+                let mut grid_copy = [[0; WIDTH]; HEIGHT];
+                
                 for row in 0..HEIGHT {
                     for col in 0..WIDTH {
                         cells[row][col] = if grid.0[col][row] == 0 {
@@ -61,12 +79,13 @@ impl GameOfLifeState {
                         } else {
                             Cell::Alive
                         };
+                        grid_copy[row][col] = grid.0[col][row];
                     }
                 }
                 //cells: grid
                 //    .0
                 //    .map(|col| col.map(|val| if val == 0 { Cell::Dead } else { Cell::Alive })),
-                GameOfLifeState { cells }
+                GameOfLifeState { cells, grid_copy }
             }
             GameOfLifeStartParam::Pattern1 => Self::pattern1(),
             GameOfLifeStartParam::Blinker => Self::blinker(),
@@ -84,12 +103,12 @@ impl GameOfLifeState {
         for row in 0..HEIGHT {
             for col in 0..WIDTH {
                 let i = col * HEIGHT + row;
-                if i % 2 == 0 || i % 7 == 0 {
+                if i % 2 == 0 || i % 9 == 0 {
                     cells[row][col] = Cell::Alive;
                 }
             }
         }
-        GameOfLifeState { cells }
+        GameOfLifeState { cells, grid_copy: create_grid_copy(cells)}
     }
     fn blinker() -> Self {
         // Oscillates between:
@@ -105,7 +124,7 @@ impl GameOfLifeState {
         cells[8][5] = Cell::Alive;
         cells[8][6] = Cell::Alive;
         cells[8][7] = Cell::Alive;
-        GameOfLifeState { cells }
+        GameOfLifeState {cells, grid_copy: create_grid_copy(cells) }
     }
     fn toad() -> Self {
         // Oscillates between
@@ -123,7 +142,7 @@ impl GameOfLifeState {
         cells[18][5] = Cell::Alive;
         cells[18][6] = Cell::Alive;
         cells[18][7] = Cell::Alive;
-        GameOfLifeState { cells }
+        GameOfLifeState { cells, grid_copy: create_grid_copy(cells) }
     }
     fn beacon() -> Self {
         // Oscillates between
@@ -146,7 +165,7 @@ impl GameOfLifeState {
         cells[28][7] = Cell::Alive;
         cells[29][6] = Cell::Alive;
         cells[29][7] = Cell::Alive;
-        GameOfLifeState { cells }
+        GameOfLifeState {cells, grid_copy: create_grid_copy(cells) }
     }
 
     fn glider() -> Self {
@@ -165,7 +184,7 @@ impl GameOfLifeState {
         cells[22][4] = Cell::Alive;
         cells[22][5] = Cell::Alive;
         cells[22][6] = Cell::Alive;
-        GameOfLifeState { cells }
+        GameOfLifeState {cells, grid_copy: create_grid_copy(cells) }
     }
 
     /// Count live neighbor cells
@@ -215,12 +234,21 @@ impl GameOfLifeState {
         self.cells = next_generation;
     }
 
-    pub fn draw_matrix(&self) -> Grid {
+    pub fn draw_matrix(&mut self) -> Grid {
         let mut grid = Grid::default();
+        let speed = 64;
 
         for row in 0..HEIGHT {
             for col in 0..WIDTH {
-                grid.0[col][row] = (self.cells[row][col] as u8) * 0xFF;
+                if self.cells[row][col] == Cell::Alive && self.grid_copy[row][col] < 255
+                {
+                    self.grid_copy[row][col] = self.grid_copy[row][col].saturating_add(speed);
+                }
+                else if self.cells[row][col] == Cell::Dead && self.grid_copy[row][col] > 0
+                {
+                    self.grid_copy[row][col] = self.grid_copy[row][col].saturating_sub(speed);
+                }
+                grid.0[col][row] = self.grid_copy[row][col];
             }
         }
 

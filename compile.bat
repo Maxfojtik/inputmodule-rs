@@ -1,0 +1,1 @@
+cargo make --cwd ledmatrix uf2
